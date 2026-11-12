@@ -1,53 +1,27 @@
-# Step 1: Use an official Maven image with JDK 17 to build and bundle the app
-FROM maven:3.9.9-eclipse-temurin-17 AS build
+
+# Step 1: Use Maven with Java 17
+FROM maven:3.9.9-eclipse-temurin-17
+
+# Step 2: Set working directory
 WORKDIR /app
 
+# Step 3: Install Chromium and dependencies
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    chromium \
+    libglib2.0-0 \
+    libnss3 \
+    libfontconfig1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Step 4: Copy project files
 COPY pom.xml .
 COPY src ./src
 
+# Step 5: Download dependencies
 RUN mvn dependency:go-offline -B
-RUN mvn test-compile
 
-# Step 2: Use a slim runtime image containing Java 17 and Chrome
-FROM eclipse-temurin:17-jre
-WORKDIR /app
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    wget \
-    gnupg \
-    curl \
-    unzip \
-    libglib2.0-0 \
-    libnss3 \
-    libfontconfig1 \
-    chromium \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=build /app /app
+# Step 6: Configure Chrome
 ENV CHROME_BIN=/usr/bin/chromium
 
-CMD ["mvn", "test"]
-# Step 2: Use a slim runtime image containing Java 17 and Chrome for execution headless environment
-FROM eclipse-temurin:17-jre
-WORKDIR /app
-
-# Install stable Chrome dependencies required for headless Selenium runs
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    wget \
-    gnupg \
-    curl \
-    unzip \
-    libglib2.0-0 \
-    libnss3 \
-    libfontconfig1 \
-    chromium \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy compiled classes and dependencies from the build stage
-COPY --from=build /app /app
-
-# Set environment variable to target the internal Chromium binary if needed
-ENV CHROME_BIN=/usr/bin/chromium
-
-# Default command to run the TestNG tests inside the container
+# Step 7: Execute Selenium and TestNG tests
 CMD ["mvn", "test"]
